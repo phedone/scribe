@@ -35,7 +35,11 @@ class RouteMatcher implements RouteMatcherInterface
                     continue;
                 }
 
-                if ($this->shouldIncludeRoute($route, $routeRule, $includes, $usingDingoRouter)) {
+                $existingUris = array_map(function (MatchedRoute $matchedRoute) {
+                    return $matchedRoute->getRoute()->methods[0] . ' ' . $matchedRoute->getRoute()->uri;
+                }, $matchedRoutes);
+
+                if ($this->shouldIncludeRoute($route, $routeRule, $includes, $usingDingoRouter, $existingUris)) {
                     $matchedRoutes[] = new MatchedRoute($route, $routeRule['apply'] ?? []);
                 }
             }
@@ -57,10 +61,11 @@ class RouteMatcher implements RouteMatcherInterface
         return collect($allRouteCollections)
             ->flatMap(function (RouteCollection $collection) {
                 return $collection->getRoutes();
-            })->toArray();
+            })->toArray()
+        ;
     }
 
-    private function shouldIncludeRoute(Route $route, array $routeRule, array $mustIncludes, bool $usingDingoRouter): bool
+    private function shouldIncludeRoute(Route $route, array $routeRule, array $mustIncludes, bool $usingDingoRouter, array $existingUris): bool
     {
         if (RoutePatternMatcher::matches($route, $mustIncludes)) {
             return true;
@@ -68,13 +73,13 @@ class RouteMatcher implements RouteMatcherInterface
 
         $matchesVersion = true;
         if ($usingDingoRouter) {
-            $matchesVersion = !empty(array_intersect($route->versions(), $routeRule['match']['versions'] ?? []));
+            $matchesVersion = ! empty(array_intersect($route->versions(), $routeRule['match']['versions'] ?? []));
         }
 
         $domainsToMatch = $routeRule['match']['domains'] ?? [];
         $pathsToMatch = $routeRule['match']['prefixes'] ?? [];
 
-        return Str::is($domainsToMatch, $route->getDomain()) && Str::is($pathsToMatch, $route->uri())
+        return Str::is($domainsToMatch, $route->getDomain()) && Str::is($pathsToMatch, $route->uri()) && ! in_array($route->uri(), $existingUris)
             && $matchesVersion;
     }
 
@@ -91,6 +96,6 @@ class RouteMatcher implements RouteMatcherInterface
             $excludes[] = 'telescope/*';
         }
 
-        return RoutePatternMatcher::matches($route, $excludes);
+        return RoutePatternMatcher::matches($route, [], $excludes);
     }
 }
