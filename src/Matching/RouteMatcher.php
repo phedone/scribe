@@ -67,6 +67,10 @@ class RouteMatcher implements RouteMatcherInterface
 
     private function shouldIncludeRoute(Route $route, array $routeRule, array $mustIncludes, bool $usingDingoRouter, array $existingUris): bool
     {
+        if (in_array($route->methods[0] . ' ' . $route->uri, $existingUris)) {
+            return false;
+        }
+
         if (RoutePatternMatcher::matches($route, $mustIncludes)) {
             return true;
         }
@@ -79,7 +83,7 @@ class RouteMatcher implements RouteMatcherInterface
         $domainsToMatch = $routeRule['match']['domains'] ?? [];
         $pathsToMatch = $routeRule['match']['prefixes'] ?? [];
 
-        return Str::is($domainsToMatch, $route->getDomain()) && Str::is($pathsToMatch, $route->uri()) && ! in_array($route->uri(), $existingUris)
+        return Str::is($domainsToMatch, $route->getDomain()) && Str::is($pathsToMatch, $route->uri())
             && $matchesVersion;
     }
 
