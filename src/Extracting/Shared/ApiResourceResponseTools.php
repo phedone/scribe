@@ -32,6 +32,7 @@ class ApiResourceResponseTools
             $isCollection,
             $modelInstantiator,
             $key,
+            $endpointData,
             $pagination,
             $additionalData
         );
@@ -64,12 +65,15 @@ class ApiResourceResponseTools
         bool $isCollection,
         ?callable $modelInstantiator,
         ?string $key,
+        ExtractedEndpointData $endpointData,
         array $paginationStrategy = [],
         array $additionalData = []
     ): JsonResource {
         // If the API Resource uses an empty $resource (e.g. an empty array), the $modelInstantiator will be null
         // See https://github.com/knuckleswtf/scribe/issues/652
         $modelInstance = is_callable($modelInstantiator) ? $modelInstantiator() : [];
+
+        static::updateEndpointDataAccordingToModelInstance($modelInstance, $endpointData);
         try {
             $resource = new $apiResourceClass($modelInstance);
         } catch (Exception) {
@@ -105,11 +109,15 @@ class ApiResourceResponseTools
             /** @var JsonResource $resource */
             $resource = $resource instanceof ResourceCollection
                 ? new $apiResourceClass($list) : $apiResourceClass::collection($list);
+        } else {
+            $models = [$modelInstance];
         }
         $resource::$wrap = $key ?? $resource::$wrap;
 
-        if (in_array("Orbit\Concerns\Orbital", class_uses($modelInstance))) {
-            $modelInstance->delete();
+        foreach ($models as $model) {
+            if (in_array("Orbit\Concerns\Orbital", class_uses($model))) {
+                $model->delete();
+            }
         }
 
         return $resource->additional($additionalData);
@@ -133,5 +141,21 @@ class ApiResourceResponseTools
         }
 
         return null;
+    }
+
+    public static function updateEndpointDataAccordingToModelInstance($modelInstance, ExtractedEndpointData $endpointData): void
+    {
+        $keyId = null;
+        foreach (array_keys($endpointData->urlParameters) as $key) {
+            if (str_contains(strtolower($key), 'id')) {
+                $keyId = $key;
+            }
+        }
+
+        if ($keyId) {
+            $endpointData->urlParameters[$keyId]['example'] =
+                in_array("Orbit\Concerns\Orbital", class_uses($modelInstance)) ? $modelInstance->slug : $modelInstance->id;
+            $endpointData->urlParameters[$keyId]['type'] = gettype($endpointData->urlParameters[$keyId]['example']);
+        }
     }
 }
