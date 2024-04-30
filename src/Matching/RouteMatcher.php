@@ -100,6 +100,6 @@ class RouteMatcher implements RouteMatcherInterface
             $excludes[] = 'telescope/*';
         }
 
-        return RoutePatternMatcher::matches($route, [], $excludes);
+        return RoutePatternMatcher::matches($route, $excludes);
     }
 }
